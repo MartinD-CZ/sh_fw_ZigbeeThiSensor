@@ -3,7 +3,7 @@
   "idf.openOcdConfigs": [
     "board/esp32h2-ftdi.cfg"
   ],
-  "idf.portWin": "COM36",
+  "idf.portWin": "COM8",
   "idf.currentSetup": "C:\\Users\\marti\\esp\\v5.3\\esp-idf",
   "idf.customExtraVars": {
     "IDF_TARGET": "esp32h2"
@@ -13,5 +13,6 @@
     "--background-index",
     "--query-driver=**",
     "--compile-commands-dir=c:\\Users\\marti\\Documents\\ESP32\\ZigbeeTHISens\\build"
-  ]
+  ],
+  "idf.flashType": "UART"
 }

@@ -1,0 +1,3 @@
+[submodule "components/MalESP"]
+	path = components/MalESP
+	url = https://github.com/MartinD-CZ/MalESP

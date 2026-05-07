@@ -1,6 +1,5 @@
 idf_component_register(
     SRCS
-    "esp_zb_light.c"
-    "light_driver.c"
+    "main.cpp"
     INCLUDE_DIRS "."
 )
