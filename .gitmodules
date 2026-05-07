@@ -1,3 +1,9 @@
 [submodule "components/MalESP"]
 	path = components/MalESP
 	url = https://github.com/MartinD-CZ/MalESP
+[submodule "components/SHT4x"]
+	path = components/SHT4x
+	url = https://github.com/MartinD-CZ/SHT4x
+[submodule "components/LTR30x"]
+	path = components/LTR30x
+	url = https://github.com/MartinD-CZ/LTR30x

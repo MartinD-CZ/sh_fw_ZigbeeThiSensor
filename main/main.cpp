@@ -22,7 +22,13 @@
 #include "esp_zb_light.h"
 
 
+#include "sensors.h"
+
 #include "mal_gpio.h"
+#include "mal_tick.h"
+
+
+const Gpio led{GPIO_NUM_12};
 
 
 
@@ -30,7 +36,7 @@
 #error Define ZB_ED_ROLE in idf.py menuconfig to compile light (End Device) source code.
 #endif
 
-static const char *TAG = "ESP_ZB_ON_OFF_LIGHT";
+static const char *TAG = "main";
 /********************* Define functions **************************/
 static void bdb_start_top_level_commissioning_cb(uint8_t mode_mask)
 {
@@ -134,6 +140,30 @@ static void esp_zb_task(void *pvParameters)
 
 extern "C" void app_main(void)
 {
+    sensors::initI2c();
+    sensors::initThermHum();
+    sensors::initIllum();
+    
+    ESP_LOGI(TAG, "Startup\n");
+    
+    led.initOutput(Gpio::Speed::SLOW, Gpio::Output::HIGH, Gpio::Type::OPEN_DRAIN);
+
+    while (true)
+    {
+        led.setLow();
+
+        const auto th = sensors::measureThermHum();
+        ESP_LOGI(TAG, "Temperature %li.%02li °C, humidity %li.%02li %%", th.first / 100, th.first % 100, th.second / 100, th.second % 100);
+        sensors::startIllumMeasurement();
+        const auto ill = sensors::getIllum();
+        ESP_LOGI(TAG, "Illuminance %lu.%03lu lx", ill / 1000, ill % 1000);
+
+        led.setHigh();
+
+        tick::delay(5000);
+    }
+    
+    
     /*esp_zb_platform_config_t config = {
         .radio_config = ESP_ZB_DEFAULT_RADIO_CONFIG(),
         .host_config = ESP_ZB_DEFAULT_HOST_CONFIG(),
@@ -143,5 +173,5 @@ extern "C" void app_main(void)
     light_driver_init(LIGHT_DEFAULT_OFF);
     xTaskCreate(esp_zb_task, "Zigbee_main", 4096, NULL, 5, NULL);*/
 
-    ESP_LOGI(TAG, "Test test test\n");
+    
 }

@@ -1,5 +1,11 @@
 idf_component_register(
     SRCS
-    "main.cpp"
-    INCLUDE_DIRS "."
+        "main.cpp"
+        "sensors.cpp"
+        "../components/SHT4x/SHT4x.cpp"
+        "../components/LTR30x/LTR308.cpp"
+    INCLUDE_DIRS 
+        "."
+        "../components/SHT4x"
+        "../components/LTR30x"
 )
