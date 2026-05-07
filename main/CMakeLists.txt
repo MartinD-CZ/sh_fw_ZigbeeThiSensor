@@ -2,6 +2,7 @@ idf_component_register(
     SRCS
         "main.cpp"
         "sensors.cpp"
+        "zigbee.cpp"
         "../components/SHT4x/SHT4x.cpp"
         "../components/LTR30x/LTR308.cpp"
     INCLUDE_DIRS 
