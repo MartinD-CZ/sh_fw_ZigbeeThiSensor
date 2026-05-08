@@ -16,6 +16,7 @@
 
 static const char *TAG = "zigbee";
 constexpr int32_t ZB_TEMP_MULTIPLIER = 100;		//the ZCL spec defines the temperature attribute as a signed 16 bit integer with a resolution of 0.01 °C
+constexpr int32_t ZB_HUM_MULTIPLIER = 100;		//the ZCL spec defines the humidity attribute as a unsigned 16 bit integer with a resolution of 0.01 %
 
 
 static void bdb_start_top_level_commissioning_cb(uint8_t mode_mask)
@@ -149,11 +150,25 @@ static void esp_zb_task(void *pvParameters)
     esp_zb_cluster_list_t* cluster_list = esp_zb_zcl_cluster_list_create();		
 	esp_zb_cluster_list_add_basic_cluster(cluster_list, createBasicCluster(3, "embedblog", "ESP32H2-THISensor"), ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
 
+    //add temperature
     esp_zb_temperature_meas_cluster_cfg_s tempConfig;
 	tempConfig.min_value = -10 * ZB_TEMP_MULTIPLIER;
 	tempConfig.max_value = 80 * ZB_TEMP_MULTIPLIER;
-	tempConfig.measured_value = 0;
+	tempConfig.measured_value = ESP_ZB_ZCL_TEMP_MEASUREMENT_MEASURED_VALUE_UNKNOWN;
 	esp_zb_cluster_list_add_temperature_meas_cluster(cluster_list, esp_zb_temperature_meas_cluster_create(&tempConfig), ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+
+    //add humidity
+    esp_zb_humidity_meas_cluster_cfg_s humConfig;
+    humConfig.min_value = 0 * ZB_HUM_MULTIPLIER;
+    humConfig.max_value = 100 * ZB_HUM_MULTIPLIER;
+    humConfig.measured_value = ESP_ZB_ZCL_REL_HUMIDITY_MEASUREMENT_MEASURED_VALUE_UNKNOWN;
+    esp_zb_cluster_list_add_humidity_meas_cluster(cluster_list, esp_zb_humidity_meas_cluster_create(&humConfig), ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+
+    esp_zb_illuminance_meas_cluster_cfg_s illConfig;
+    illConfig.min_value = 0;
+    illConfig.max_value = 65'000;
+    illConfig.measured_value = ESP_ZB_ZCL_ATTR_ILLUMINANCE_MEASUREMENT_MEASURED_VALUE_INVALID;
+    esp_zb_cluster_list_add_illuminance_meas_cluster(cluster_list, esp_zb_illuminance_meas_cluster_create(&illConfig), ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
 	
 	//create endpoint list and populate it
 	esp_zb_ep_list_t* ep_list = esp_zb_ep_list_create();
@@ -192,14 +207,34 @@ void zigbee::startTask()
  * @brief 
  * 
  * @param temp      Temperature in 0.01 °C, e.g. 2534 means 25.34 °C
- * @param hum
+ * @param hum       Humidity in 0.01 %, e.g. 4534 means 45.34 %
  */
 void zigbee::updateTempHum(int16_t temp, uint16_t hum)
 {    
     esp_zb_lock_acquire(portMAX_DELAY);
-    const auto status = esp_zb_zcl_set_attribute_val(10, ESP_ZB_ZCL_CLUSTER_ID_TEMP_MEASUREMENT, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_ID, &temp, false);
+    const auto stat1 = esp_zb_zcl_set_attribute_val(10, ESP_ZB_ZCL_CLUSTER_ID_TEMP_MEASUREMENT, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_ID, &temp, false);
+    const auto stat2 = esp_zb_zcl_set_attribute_val(10, ESP_ZB_ZCL_CLUSTER_ID_REL_HUMIDITY_MEASUREMENT, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_ATTR_REL_HUMIDITY_MEASUREMENT_VALUE_ID, &hum, false);
     esp_zb_lock_release();
 
-    if (status != ESP_ZB_ZCL_STATUS_SUCCESS)
-        ESP_LOGW(TAG, "Failed to update temperature attribute value: 0x%04X", status);
+    if (stat1 != ESP_ZB_ZCL_STATUS_SUCCESS)
+        ESP_LOGW(TAG, "Failed to update temperature attribute value: 0x%04X", stat1);
+    if (stat2 != ESP_ZB_ZCL_STATUS_SUCCESS)
+        ESP_LOGW(TAG, "Failed to update humidity attribute value: 0x%04X", stat2);
+}
+
+
+void zigbee::updateIlluminance(uint32_t ill_mLx)
+{
+    //this could be handled without using floats, but using floats increased code size by 1.5 kB, so it does not matter
+    
+    float lux = ill_mLx / 1000.0f;		//convert to lx
+    float raw = 10000.0f * std::log10(lux) + 1.0f;
+    uint16_t illum = std::round(raw);
+    
+    esp_zb_lock_acquire(portMAX_DELAY);
+    const auto stat = esp_zb_zcl_set_attribute_val(10, ESP_ZB_ZCL_CLUSTER_ID_ILLUMINANCE_MEASUREMENT, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_ATTR_ILLUMINANCE_MEASUREMENT_MEASURED_VALUE_ID, &illum, false);
+    esp_zb_lock_release();
+
+    if (stat != ESP_ZB_ZCL_STATUS_SUCCESS)
+        ESP_LOGW(TAG, "Failed to update illuminance attribute value: 0x%04X", stat);
 }

@@ -44,16 +44,14 @@ extern "C" void app_main(void)
 
     while (true)
     {
-        //led.setLow();
-
         const auto th = sensors::measureThermHum();
         ESP_LOGI(TAG, "Temperature %li.%02li °C, humidity %li.%02li %%", th.first / 100, th.first % 100, th.second / 100, th.second % 100);
         zigbee::updateTempHum(th.first, th.second);
-        /*sensors::startIllumMeasurement();
+        
+        sensors::startIllumMeasurement();
         const auto ill = sensors::getIllum();
-        ESP_LOGI(TAG, "Illuminance %lu.%03lu lx", ill / 1000, ill % 1000);*/
-
-        //led.setHigh();
+        ESP_LOGI(TAG, "Illuminance %lu.%03lu lx", ill / 1000, ill % 1000);
+        zigbee::updateIlluminance(ill);
 
         tick::delay(60'000);
     }
