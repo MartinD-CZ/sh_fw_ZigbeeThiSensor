@@ -4,7 +4,7 @@
     "board/esp32h2-ftdi.cfg"
   ],
   "idf.portWin": "COM8",
-  "idf.currentSetup": "C:\\Users\\marti\\esp\\v5.3\\esp-idf",
+  "idf.currentSetup": "C:\\esp32\\v5.5.4\\esp-idf",
   "idf.customExtraVars": {
     "IDF_TARGET": "esp32h2"
   },
