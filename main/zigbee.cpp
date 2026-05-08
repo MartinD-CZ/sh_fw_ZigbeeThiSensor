@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <cstring>
 
+
 static const char *TAG = "zigbee";
 
 static constexpr uint8_t SENSOR_ENDPOINT = 10;
@@ -37,6 +38,7 @@ static bool s_steering_retry_task_running = false;
 
 static char s_manufacturer_name_pstr[33] = {};
 static char s_model_name_pstr[33] = {};
+
 
 static void make_zcl_char_string(char *dst, size_t dst_size, const char *src)
 {
@@ -56,10 +58,12 @@ static void make_zcl_char_string(char *dst, size_t dst_size, const char *src)
     }
 }
 
+
 static esp_err_t check_ezb(ezb_err_t err)
 {
     return esp_zigbee_err_to_esp(err);
 }
+
 
 static void start_network_steering()
 {
@@ -68,6 +72,7 @@ static void start_network_steering()
         ESP_LOGW(TAG, "Failed to start network steering: 0x%04X", err);
     }
 }
+
 
 static void network_steering_retry_task(void *)
 {
@@ -84,6 +89,7 @@ static void network_steering_retry_task(void *)
     s_steering_retry_task_running = false;
     vTaskDelete(nullptr);
 }
+
 
 static void schedule_network_steering_retry()
 {
@@ -103,6 +109,7 @@ static void schedule_network_steering_retry()
         ESP_LOGW(TAG, "Failed to create steering retry task");
     }
 }
+
 
 static bool app_signal_handler(const ezb_app_signal_t *app_signal)
 {
@@ -181,6 +188,7 @@ static bool app_signal_handler(const ezb_app_signal_t *app_signal)
     }
 }
 
+
 static void zcl_core_set_attr_value_handler(ezb_zcl_set_attr_value_message_t *message)
 {
     if (message == nullptr) {
@@ -197,6 +205,7 @@ static void zcl_core_set_attr_value_handler(ezb_zcl_set_attr_value_message_t *me
              message->in.attribute.id,
              message->in.attribute.data.size);
 }
+
 
 static void zcl_core_action_handler(ezb_zcl_core_action_callback_id_t callback_id, void *message)
 {
@@ -222,6 +231,7 @@ static void zcl_core_action_handler(ezb_zcl_core_action_callback_id_t callback_i
         break;
     }
 }
+
 
 static ezb_zcl_cluster_desc_t create_basic_cluster(uint8_t power_source,
                                                    const char *manufacturer_name,
@@ -253,6 +263,7 @@ static ezb_zcl_cluster_desc_t create_basic_cluster(uint8_t power_source,
     return cluster;
 }
 
+
 static esp_err_t create_sensor_endpoint(uint8_t ep_id)
 {
     ezb_af_device_desc_t dev_desc = ezb_af_create_device_desc();
@@ -269,14 +280,14 @@ static esp_err_t create_sensor_endpoint(uint8_t ep_id)
 
     // Basic cluster
     ezb_zcl_cluster_desc_t basic_desc = create_basic_cluster(
-        3, // ZCL Basic PowerSource: battery; use 4 for DC source if that is more appropriate for your hardware
+        EZB_ZCL_BASIC_POWER_SOURCE_BATTERY,
         "embedblog",
         "ESP32H2-THISensor");
     ESP_ERROR_CHECK(check_ezb(ezb_af_endpoint_add_cluster_desc(ep_desc, basic_desc)));
 
     // Temperature Measurement cluster
     ezb_zcl_temperature_measurement_cluster_server_config_t temp_cfg = {};
-    temp_cfg.measured_value = static_cast<int16_t>(0x8000); // ZCL unknown/invalid temperature
+    temp_cfg.measured_value = EZB_ZCL_TEMPERATURE_MEASUREMENT_MEASURED_VALUE_DEFAULT_VALUE;
     temp_cfg.min_measured_value = static_cast<int16_t>(-10 * ZB_TEMP_MULTIPLIER);
     temp_cfg.max_measured_value = static_cast<int16_t>(80 * ZB_TEMP_MULTIPLIER);
 
@@ -288,7 +299,7 @@ static esp_err_t create_sensor_endpoint(uint8_t ep_id)
 
     // Relative Humidity Measurement cluster
     ezb_zcl_rel_humidity_measurement_cluster_server_config_t hum_cfg = {};
-    hum_cfg.measured_value = static_cast<uint16_t>(0xFFFF); // ZCL unknown/invalid humidity
+    hum_cfg.measured_value = EZB_ZCL_REL_HUMIDITY_MEASUREMENT_MEASURED_VALUE_DEFAULT_VALUE;
     hum_cfg.min_measured_value = static_cast<uint16_t>(0 * ZB_HUM_MULTIPLIER);
     hum_cfg.max_measured_value = static_cast<uint16_t>(100 * ZB_HUM_MULTIPLIER);
 
@@ -300,7 +311,7 @@ static esp_err_t create_sensor_endpoint(uint8_t ep_id)
 
     // Illuminance Measurement cluster
     ezb_zcl_illuminance_measurement_cluster_server_config_t ill_cfg = {};
-    ill_cfg.measured_value = static_cast<uint16_t>(0xFFFF); // invalid/unknown
+    ill_cfg.measured_value = EZB_ZCL_ILLUMINANCE_MEASUREMENT_MEASURED_VALUE_DEFAULT_VALUE;
     ill_cfg.min_measured_value = 0;
     ill_cfg.max_measured_value = 65000;
 
@@ -316,6 +327,7 @@ static esp_err_t create_sensor_endpoint(uint8_t ep_id)
     return ESP_OK;
 }
 
+
 static ezb_err_t report_attr(uint16_t cluster_id, uint16_t attr_id)
 {
     ezb_zcl_report_attr_cmd_t report_attr_cmd = {};
@@ -328,6 +340,7 @@ static ezb_err_t report_attr(uint16_t cluster_id, uint16_t attr_id)
     return ezb_zcl_report_attr_cmd_req(&report_attr_cmd);
 }
 
+
 static void esp_zigbee_task(void *)
 {
     esp_zigbee_config_t config = {};
@@ -338,7 +351,7 @@ static void esp_zigbee_task(void *)
     config.device_config.zed_config.keep_alive = 3000;
 
     config.platform_config.radio_config.radio_mode = ESP_ZIGBEE_RADIO_MODE_NATIVE;
-    config.platform_config.storage_partition_name = nullptr;
+    config.platform_config.storage_partition_name = "zb_storage";
 
     ESP_ERROR_CHECK(esp_zigbee_init(&config));
 
@@ -367,6 +380,7 @@ void zigbee::startTask()
 {
     xTaskCreate(esp_zigbee_task, "Zigbee_main", 6144, nullptr, 5, nullptr);
 }
+
 
 /**
  * @brief Update temperature and humidity attributes.
@@ -428,6 +442,7 @@ void zigbee::updateTempHum(int16_t temp, uint16_t hum)
         ESP_LOGW(TAG, "Failed to update humidity attribute: 0x%02X", hum_status);
     }
 }
+
 
 void zigbee::updateIlluminance(uint32_t ill_mLx)
 {
