@@ -26,6 +26,7 @@ extern "C" void app_main(void)
     led.initOutput(Gpio::Speed::SLOW, Gpio::Output::HIGH, Gpio::Type::OPEN_DRAIN);
 
     ESP_ERROR_CHECK(nvs_flash_init());
+    ESP_ERROR_CHECK(nvs_flash_init_partition("zb_storage"));
 
     esp_pm_config_t pm_config = 
     {
