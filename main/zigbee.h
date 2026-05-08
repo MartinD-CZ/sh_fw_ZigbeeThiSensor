@@ -9,4 +9,5 @@ namespace zigbee
     void startTask();
     void updateTempHum(int16_t temp, uint16_t hum);
     void updateIlluminance(uint32_t ill_mLx);
+    void updateBattery(uint16_t voltage_mV);
 }
