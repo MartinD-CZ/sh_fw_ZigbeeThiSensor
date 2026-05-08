@@ -20,10 +20,12 @@ extern "C" void app_main(void)
     sensors::initI2c();
     sensors::initThermHum();
     sensors::initIllum();
-    
-    ESP_LOGI(TAG, "Startup\n");
-    
+    sensors::initVbatMeasurement();
+        
     led.initOutput(Gpio::Speed::SLOW, Gpio::Output::HIGH, Gpio::Type::OPEN_DRAIN);
+    led.setLow();
+    tick::delay(200);
+    led.setHigh();
 
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(nvs_flash_init_partition("zb_storage"));
