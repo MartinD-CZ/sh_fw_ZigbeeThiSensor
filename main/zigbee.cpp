@@ -10,10 +10,6 @@
 #include <cstring>
 
 
-#if !defined ZB_ED_ROLE
-#error Define ZB_ED_ROLE in idf.py menuconfig to compile light (End Device) source code.
-#endif
-
 static const char *TAG = "zigbee";
 constexpr int32_t ZB_TEMP_MULTIPLIER = 100;		//the ZCL spec defines the temperature attribute as a signed 16 bit integer with a resolution of 0.01 °C
 constexpr int32_t ZB_HUM_MULTIPLIER = 100;		//the ZCL spec defines the humidity attribute as a unsigned 16 bit integer with a resolution of 0.01 %
@@ -136,6 +132,14 @@ esp_zb_attribute_list_t* createBasicCluster(uint8_t powerSource, const char* man
 
 static void esp_zb_task(void *pvParameters)
 {
+    esp_zb_platform_config_t config = {
+        .radio_config = {.radio_mode = ZB_RADIO_MODE_NATIVE},
+        .host_config = {.host_connection_mode = ZB_HOST_CONNECTION_MODE_NONE},
+    };
+    ESP_ERROR_CHECK(esp_zb_platform_config(&config));
+    
+    esp_zb_sleep_enable(true);
+    
     esp_zb_cfg_t zb_nwk_cfg = {};
     zb_nwk_cfg.esp_zb_role = ESP_ZB_DEVICE_TYPE_ED;
     zb_nwk_cfg.install_code_policy = false;
@@ -145,6 +149,8 @@ static void esp_zb_task(void *pvParameters)
     };
     
     esp_zb_init(&zb_nwk_cfg);
+    esp_zb_set_rx_on_when_idle(false);
+    esp_zb_sleep_set_threshold(20);
 
     //create & populate cluster list
     esp_zb_cluster_list_t* cluster_list = esp_zb_zcl_cluster_list_create();		
@@ -182,7 +188,7 @@ static void esp_zb_task(void *pvParameters)
     esp_zb_core_action_handler_register(zb_action_handler);
     esp_zb_set_primary_network_channel_set(ESP_ZB_TRANSCEIVER_ALL_CHANNELS_MASK);
     ESP_ERROR_CHECK(esp_zb_start(false));
-    esp_zb_main_loop_iteration();
+    esp_zb_stack_main_loop();
 }
 
 
@@ -193,12 +199,6 @@ static void esp_zb_task(void *pvParameters)
  */
 void zigbee::startTask()
 {
-    esp_zb_platform_config_t config = {
-        .radio_config = {.radio_mode = ZB_RADIO_MODE_NATIVE},
-        .host_config = {.host_connection_mode = ZB_HOST_CONNECTION_MODE_NONE},
-    };
-
-    ESP_ERROR_CHECK(esp_zb_platform_config(&config));
     xTaskCreate(esp_zb_task, "Zigbee_main", 4096, NULL, 5, NULL);
 }
 
