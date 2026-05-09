@@ -20,6 +20,7 @@ extern "C" void app_main(void)
     sensors::initI2c();
     sensors::initThermHum();
     sensors::initIllum();
+    sensors::initVbatMeasurement();
     
     ESP_LOGI(TAG, "Startup\n");
     
@@ -48,6 +49,6 @@ extern "C" void app_main(void)
         ESP_LOGI(TAG, "Illuminance %lu.%03lu lx", ill / 1000, ill % 1000);
         zigbee::updateIlluminance(ill);
 
-        tick::delay(60'000);
+        tick::delay(20'000);
     }
 }

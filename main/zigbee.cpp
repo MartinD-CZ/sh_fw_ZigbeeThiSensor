@@ -44,8 +44,6 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t* signal_struct)
                 } 
                 else 
                     ESP_LOGI(TAG, "Device rebooted");
-
-				//xTaskCreate(temperature_task, "TemperatureTsk", 4096, NULL, 4, NULL);
             } 
             else
                 ESP_LOGW(TAG, "Failed to initialize Zigbee stack (status: %s)", esp_err_to_name(err_status));       // commissioning failed
@@ -67,7 +65,6 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t* signal_struct)
             }
             break;
 		case ESP_ZB_COMMON_SIGNAL_CAN_SLEEP:
-			ESP_LOGI(TAG, "Zigbee can sleep");
 			esp_zb_sleep_now();
 			break;
         default:
