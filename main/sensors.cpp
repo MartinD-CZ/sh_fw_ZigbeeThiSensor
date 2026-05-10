@@ -89,6 +89,6 @@ uint16_t sensors::measureBattery()
 	vbat_en.setLow();
 	
 	// Convert raw ADC value to millivolts
-	uint16_t voltage = (uint16_t)((raw * 1100) / 4095);
+	uint16_t voltage = (uint16_t)((raw * 1100 * 4 * 2) / 4095);
 	return voltage;
 }

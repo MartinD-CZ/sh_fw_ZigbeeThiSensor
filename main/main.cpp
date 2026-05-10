@@ -49,6 +49,10 @@ extern "C" void app_main(void)
         ESP_LOGI(TAG, "Illuminance %lu.%03lu lx", ill / 1000, ill % 1000);
         zigbee::updateIlluminance(ill);
 
+        const auto vbat = sensors::measureBattery();
+        ESP_LOGI(TAG, "Battery voltage %lu mV", vbat);
+        zigbee::updateVbat(vbat);
+
         tick::delay(20'000);
     }
 }

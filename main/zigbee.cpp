@@ -9,6 +9,15 @@
 
 #include <cstring>
 
+//this is missing for some reason
+#ifndef ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_ID
+#define ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_ID 0x0020
+#endif
+
+#ifndef ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_INVALID
+#define ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_INVALID 0xFF
+#endif
+
 
 static const char *TAG = "zigbee";
 constexpr int32_t ZB_TEMP_MULTIPLIER = 100;		//the ZCL spec defines the temperature attribute as a signed 16 bit integer with a resolution of 0.01 °C
@@ -105,7 +114,7 @@ esp_zb_attribute_list_t* createBasicCluster(uint8_t powerSource, const char* man
 	esp_zb_basic_cluster_cfg_s basicConfig = 
 	{
 		.zcl_version = ESP_ZB_ZCL_BASIC_ZCL_VERSION_DEFAULT_VALUE,
-		.power_source = 4			//DC source, see note page 178
+		.power_source = powerSource
 	};
 	auto cluster = esp_zb_basic_cluster_create(&basicConfig);		//this creates all three mandatory attributes
 
@@ -142,7 +151,7 @@ static void esp_zb_task(void *pvParameters)
     zb_nwk_cfg.install_code_policy = false;
     zb_nwk_cfg.nwk_cfg.zed_cfg = {
         .ed_timeout = ESP_ZB_ED_AGING_TIMEOUT_64MIN,
-        .keep_alive = 3000,
+        .keep_alive = 10000,
     };
     
     esp_zb_init(&zb_nwk_cfg);
@@ -151,7 +160,7 @@ static void esp_zb_task(void *pvParameters)
 
     //create & populate cluster list
     esp_zb_cluster_list_t* cluster_list = esp_zb_zcl_cluster_list_create();		
-	esp_zb_cluster_list_add_basic_cluster(cluster_list, createBasicCluster(3, "embedblog", "ESP32H2-THISensor"), ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+	esp_zb_cluster_list_add_basic_cluster(cluster_list, createBasicCluster(ESP_ZB_ZCL_BASIC_POWER_SOURCE_BATTERY, "embedblog", "ESP32H2-THISensor"), ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
 
     //add temperature
     esp_zb_temperature_meas_cluster_cfg_s tempConfig;
@@ -167,12 +176,24 @@ static void esp_zb_task(void *pvParameters)
     humConfig.measured_value = ESP_ZB_ZCL_REL_HUMIDITY_MEASUREMENT_MEASURED_VALUE_UNKNOWN;
     esp_zb_cluster_list_add_humidity_meas_cluster(cluster_list, esp_zb_humidity_meas_cluster_create(&humConfig), ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
 
+    //add illuminance
     esp_zb_illuminance_meas_cluster_cfg_s illConfig;
     illConfig.min_value = 0;
     illConfig.max_value = 65'000;
     illConfig.measured_value = ESP_ZB_ZCL_ATTR_ILLUMINANCE_MEASUREMENT_MEASURED_VALUE_INVALID;
     esp_zb_cluster_list_add_illuminance_meas_cluster(cluster_list, esp_zb_illuminance_meas_cluster_create(&illConfig), ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
 	
+    //add battery measurement
+    static uint8_t s_battVolt = ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_INVALID;
+    auto pwrAttributes = esp_zb_zcl_attr_list_create(ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG);
+    esp_zb_cluster_add_attr(pwrAttributes, 
+        ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG, 
+        ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_ID,
+        ESP_ZB_ZCL_ATTR_TYPE_U8,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_ONLY | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
+        &s_battVolt);
+    esp_zb_cluster_list_add_power_config_cluster(cluster_list, pwrAttributes, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+
 	//create endpoint list and populate it
 	esp_zb_ep_list_t* ep_list = esp_zb_ep_list_create();
     esp_zb_endpoint_config_t endpointConfig;
@@ -234,4 +255,17 @@ void zigbee::updateIlluminance(uint32_t ill_mLx)
 
     if (stat != ESP_ZB_ZCL_STATUS_SUCCESS)
         ESP_LOGW(TAG, "Failed to update illuminance attribute value: 0x%04X", stat);
+}
+
+
+void zigbee::updateVbat(uint16_t vbat_mV)
+{
+    uint8_t vbat = (vbat_mV + 50) / 100;
+    
+    esp_zb_lock_acquire(portMAX_DELAY);
+    const auto stat = esp_zb_zcl_set_attribute_val(10, ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_ID, &vbat, false);
+    esp_zb_lock_release();
+
+    if (stat != ESP_ZB_ZCL_STATUS_SUCCESS)
+        ESP_LOGW(TAG, "Failed to update battery voltage attribute value: 0x%04X", stat);
 }
