@@ -2,6 +2,7 @@ idf_component_register(
     SRCS
         "battery_pct.cpp"
         "main.cpp"
+        "onboard_led.cpp"
         "sensors.cpp"
         "zigbee.cpp"
         "../components/SHT4x/SHT4x.cpp"

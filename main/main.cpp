@@ -1,8 +1,8 @@
 #include "sensors.h"
 #include "zigbee.h"
 #include "battery_pct.h"
+#include "onboard_led.h"
 
-#include "mal_gpio.h"
 #include "mal_tick.h"
 
 #include "etl/vector.h"
@@ -15,8 +15,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-
-extern const Gpio led{GPIO_NUM_12};
 
 static const char *TAG = "main";
 
@@ -31,8 +29,6 @@ extern "C" void app_main(void)
     sensors::initVbatMeasurement();
     
     ESP_LOGI(TAG, "Startup\n");
-    
-    led.initOutput(Gpio::Speed::SLOW, Gpio::Output::HIGH, Gpio::Type::OPEN_DRAIN);
 
     ESP_ERROR_CHECK(nvs_flash_init());
 
@@ -43,6 +39,8 @@ extern "C" void app_main(void)
         .light_sleep_enable = true
     };
     ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
+
+    onboard_led::init();
 
     zigbee::startTask();
     xTaskCreate(batteryTask, "batt_tsk", 2048, NULL, 3, NULL);

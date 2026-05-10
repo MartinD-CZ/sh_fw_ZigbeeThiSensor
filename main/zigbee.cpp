@@ -1,6 +1,6 @@
 #include "zigbee.h"
 
-#include "mal_gpio.h"
+#include "onboard_led.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -21,7 +21,6 @@
 static const char *TAG = "zigbee";
 constexpr int32_t ZB_TEMP_MULTIPLIER = 100;		//the ZCL spec defines the temperature attribute as a signed 16 bit integer with a resolution of 0.01 °C
 constexpr int32_t ZB_HUM_MULTIPLIER = 100;		//the ZCL spec defines the humidity attribute as a unsigned 16 bit integer with a resolution of 0.01 %
-extern const Gpio led;
 
 
 static void bdb_start_top_level_commissioning_cb(uint8_t mode_mask)
@@ -120,9 +119,9 @@ static esp_err_t zb_action_handler(esp_zb_core_action_callback_id_t callback_id,
                 ESP_LOGI(TAG, "IdentifyTime = %u seconds", identify_time);
 
                 if (identify_time > 0)
-                    led.setLow();
+                    onboard_led::blinkOn(500, 500);
                 else
-                    led.setHigh();
+                    onboard_led::blinkOff();
             }
 			break;
 		}
