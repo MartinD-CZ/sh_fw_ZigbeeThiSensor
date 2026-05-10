@@ -1,5 +1,7 @@
 #include "zigbee.h"
 
+#include "mal_gpio.h"
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -19,6 +21,7 @@
 static const char *TAG = "zigbee";
 constexpr int32_t ZB_TEMP_MULTIPLIER = 100;		//the ZCL spec defines the temperature attribute as a signed 16 bit integer with a resolution of 0.01 °C
 constexpr int32_t ZB_HUM_MULTIPLIER = 100;		//the ZCL spec defines the humidity attribute as a unsigned 16 bit integer with a resolution of 0.01 %
+extern const Gpio led;
 
 
 static void bdb_start_top_level_commissioning_cb(uint8_t mode_mask)
@@ -106,14 +109,26 @@ static esp_err_t zb_action_handler(esp_zb_core_action_callback_id_t callback_id,
     {
         case ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID:
 		{
-			esp_zb_zcl_set_attr_value_message_t* setAtrMsg = (esp_zb_zcl_set_attr_value_message_t*)message;
-			ESP_LOGI(TAG, "Received message: endpoint %d, cluster 0x%x, attribute 0x%x, data size %d", setAtrMsg->info.dst_endpoint, setAtrMsg->info.cluster,
-             	setAtrMsg->attribute.id, setAtrMsg->attribute.data.size);
+			auto msg = (esp_zb_zcl_set_attr_value_message_t*)message;
+			ESP_LOGI(TAG, "Set attr:: endpoint %d, cluster 0x%x, attr 0x%x, size %d", 
+                msg->info.dst_endpoint, msg->info.cluster, msg->attribute.id, msg->attribute.data.size);
+
+            if (msg->info.dst_endpoint == 10 && msg->info.cluster == ESP_ZB_ZCL_CLUSTER_ID_IDENTIFY && msg->attribute.id == ESP_ZB_ZCL_ATTR_IDENTIFY_IDENTIFY_TIME_ID &&
+                msg->attribute.data.size == sizeof(uint16_t) && msg->attribute.data.value != nullptr) 
+            {
+                uint16_t identify_time = *static_cast<uint16_t *>(msg->attribute.data.value);
+                ESP_LOGI(TAG, "IdentifyTime = %u seconds", identify_time);
+
+                if (identify_time > 0)
+                    led.setLow();
+                else
+                    led.setHigh();
+            }
 			break;
 		}
         case ESP_ZB_CORE_CMD_DEFAULT_RESP_CB_ID:
         {
-            auto *msg = (esp_zb_zcl_cmd_default_resp_message_t*)message;
+            auto msg = (esp_zb_zcl_cmd_default_resp_message_t*)message;
 
             ESP_LOGI(TAG, "Default response: dst=0x%04x, src_ep=%u, dst_ep=%u, cluster=0x%04x, resp_to_cmd=0x%02x (%s), status=0x%02x",
                     msg->info.dst_address, msg->info.src_endpoint, msg->info.dst_endpoint, msg->info.cluster, msg->resp_to_cmd, zcl_cmd_name(msg->resp_to_cmd), msg->status_code);
@@ -219,6 +234,13 @@ static void esp_zb_task(void *pvParameters)
         ESP_ZB_ZCL_ATTR_ACCESS_READ_ONLY | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
         &s_battPct);
     esp_zb_cluster_list_add_power_config_cluster(cluster_list, pwrAttributes, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+
+    //identify cluster
+    static uint16_t s_identify_time = ESP_ZB_ZCL_IDENTIFY_IDENTIFY_TIME_DEFAULT_VALUE;
+    esp_zb_identify_cluster_cfg_t identify_cfg = {};
+    identify_cfg.identify_time = s_identify_time;
+    esp_zb_attribute_list_t* identify_cluster = esp_zb_identify_cluster_create(&identify_cfg);
+    esp_zb_cluster_list_add_identify_cluster(cluster_list, identify_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
 
 	//create endpoint list and populate it
 	esp_zb_ep_list_t* ep_list = esp_zb_ep_list_create();

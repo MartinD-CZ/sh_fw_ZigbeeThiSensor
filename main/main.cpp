@@ -16,7 +16,7 @@
 #include "freertos/task.h"
 
 
-const Gpio led{GPIO_NUM_12};
+extern const Gpio led{GPIO_NUM_12};
 
 static const char *TAG = "main";
 
@@ -45,7 +45,7 @@ extern "C" void app_main(void)
     ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
 
     zigbee::startTask();
-    xTaskCreate(batteryTask, "batt_tsk", configMINIMAL_STACK_SIZE, NULL, 3, NULL);
+    xTaskCreate(batteryTask, "batt_tsk", 2048, NULL, 3, NULL);
 
     while (true)
     {
