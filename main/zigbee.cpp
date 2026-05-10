@@ -10,13 +10,10 @@
 #include <cstring>
 
 //this is missing for some reason
-#ifndef ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_ID
 #define ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_ID 0x0020
-#endif
-
-#ifndef ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_INVALID
 #define ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_INVALID 0xFF
-#endif
+#define ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_PERCENTAGE_REMAINING_ID 0x0021
+#define ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_PERCENTAGE_REMAINING_INVALID 0xFF
 
 
 static const char *TAG = "zigbee";
@@ -184,14 +181,21 @@ static void esp_zb_task(void *pvParameters)
     esp_zb_cluster_list_add_illuminance_meas_cluster(cluster_list, esp_zb_illuminance_meas_cluster_create(&illConfig), ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
 	
     //add battery measurement
-    static uint8_t s_battVolt = ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_INVALID;
     auto pwrAttributes = esp_zb_zcl_attr_list_create(ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG);
+    static uint8_t s_battVolt = ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_INVALID;
     esp_zb_cluster_add_attr(pwrAttributes, 
         ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG, 
         ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_ID,
         ESP_ZB_ZCL_ATTR_TYPE_U8,
         ESP_ZB_ZCL_ATTR_ACCESS_READ_ONLY | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
         &s_battVolt);
+    static uint8_t s_battPct = ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_PERCENTAGE_REMAINING_INVALID;
+    esp_zb_cluster_add_attr(pwrAttributes, 
+        ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG, 
+        ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_PERCENTAGE_REMAINING_ID,
+        ESP_ZB_ZCL_ATTR_TYPE_U8,
+        ESP_ZB_ZCL_ATTR_ACCESS_READ_ONLY | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
+        &s_battPct);
     esp_zb_cluster_list_add_power_config_cluster(cluster_list, pwrAttributes, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
 
 	//create endpoint list and populate it
@@ -258,14 +262,18 @@ void zigbee::updateIlluminance(uint32_t ill_mLx)
 }
 
 
-void zigbee::updateVbat(uint16_t vbat_mV)
+void zigbee::updateVbat(uint16_t vbat_mV, uint8_t vbat_pct)
 {
     uint8_t vbat = (vbat_mV + 50) / 100;
+    vbat_pct *= 2;
     
     esp_zb_lock_acquire(portMAX_DELAY);
     const auto stat = esp_zb_zcl_set_attribute_val(10, ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_ID, &vbat, false);
+    const auto stat_pct = esp_zb_zcl_set_attribute_val(10, ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_PERCENTAGE_REMAINING_ID, &vbat_pct, false);
     esp_zb_lock_release();
 
     if (stat != ESP_ZB_ZCL_STATUS_SUCCESS)
         ESP_LOGW(TAG, "Failed to update battery voltage attribute value: 0x%04X", stat);
+    if (stat_pct != ESP_ZB_ZCL_STATUS_SUCCESS)
+        ESP_LOGW(TAG, "Failed to update battery percentage attribute value: 0x%04X", stat_pct);
 }

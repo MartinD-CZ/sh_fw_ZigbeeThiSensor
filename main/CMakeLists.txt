@@ -1,5 +1,6 @@
 idf_component_register(
     SRCS
+        "battery_pct.cpp"
         "main.cpp"
         "sensors.cpp"
         "zigbee.cpp"

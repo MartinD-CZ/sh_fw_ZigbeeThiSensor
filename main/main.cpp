@@ -1,5 +1,6 @@
 #include "sensors.h"
 #include "zigbee.h"
+#include "battery_pct.h"
 
 #include "mal_gpio.h"
 #include "mal_tick.h"
@@ -50,8 +51,9 @@ extern "C" void app_main(void)
         zigbee::updateIlluminance(ill);
 
         const auto vbat = sensors::measureBattery(8);
-        ESP_LOGI(TAG, "Battery voltage %lu mV", vbat);
-        zigbee::updateVbat(vbat);
+        const auto vbat_pct = battery_mv_to_zigbee_percent(vbat, BatteryType::LiIon1S);
+        ESP_LOGI(TAG, "Battery voltage %lu mV (%u %%)", vbat, vbat_pct);
+        zigbee::updateVbat(vbat, vbat_pct);
 
         tick::delay(20'000);
     }
