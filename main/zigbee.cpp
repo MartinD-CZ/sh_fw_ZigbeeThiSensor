@@ -80,6 +80,26 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t* signal_struct)
 }
 
 
+static const char *zcl_cmd_name(uint8_t cmd)
+{
+    switch (cmd) {
+        case 0x00: return "Read Attributes";
+        case 0x01: return "Read Attributes Response";
+        case 0x02: return "Write Attributes";
+        case 0x04: return "Write Attributes Response";
+        case 0x06: return "Configure Reporting";
+        case 0x07: return "Configure Reporting Response";
+        case 0x08: return "Read Reporting Config";
+        case 0x09: return "Read Reporting Config Response";
+        case 0x0A: return "Report Attributes";
+        case 0x0B: return "Default Response";
+        case 0x0C: return "Discover Attributes";
+        case 0x0D: return "Discover Attributes Response";
+        default:   return "Unknown";
+    }
+}
+
+
 static esp_err_t zb_action_handler(esp_zb_core_action_callback_id_t callback_id, const void *message)
 {
     switch (callback_id) 
@@ -92,11 +112,13 @@ static esp_err_t zb_action_handler(esp_zb_core_action_callback_id_t callback_id,
 			break;
 		}
         case ESP_ZB_CORE_CMD_DEFAULT_RESP_CB_ID:
-		{
-            esp_zb_zcl_cmd_default_resp_message_t* msg = (esp_zb_zcl_cmd_default_resp_message_t*)message;
-            ESP_LOGI(TAG, "Default response callback: dst 0x%x, status: %u", msg->info.dst_address, msg->status_code);
+        {
+            auto *msg = (esp_zb_zcl_cmd_default_resp_message_t*)message;
+
+            ESP_LOGI(TAG, "Default response: dst=0x%04x, src_ep=%u, dst_ep=%u, cluster=0x%04x, resp_to_cmd=0x%02x (%s), status=0x%02x",
+                    msg->info.dst_address, msg->info.src_endpoint, msg->info.dst_endpoint, msg->info.cluster, msg->resp_to_cmd, zcl_cmd_name(msg->resp_to_cmd), msg->status_code);
             break;
-		}
+        }
         default:
             ESP_LOGW(TAG, "Unhandled Zigbee action 0x%x callback", callback_id);
             break;
