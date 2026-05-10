@@ -5,15 +5,22 @@
 #include "mal_gpio.h"
 #include "mal_tick.h"
 
+#include "etl/vector.h"
+
 #include "esp_check.h"
 #include "esp_log.h"
 #include "esp_pm.h"
 #include "nvs_flash.h"
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
 
 const Gpio led{GPIO_NUM_12};
 
 static const char *TAG = "main";
+
+static void batteryTask(void* param);
 
 
 extern "C" void app_main(void)
@@ -38,6 +45,7 @@ extern "C" void app_main(void)
     ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
 
     zigbee::startTask();
+    xTaskCreate(batteryTask, "batt_tsk", configMINIMAL_STACK_SIZE, NULL, 3, NULL);
 
     while (true)
     {
@@ -50,11 +58,20 @@ extern "C" void app_main(void)
         ESP_LOGI(TAG, "Illuminance %lu.%03lu lx", ill / 1000, ill % 1000);
         zigbee::updateIlluminance(ill);
 
-        const auto vbat = sensors::measureBattery(8);
+        tick::delay(20'000);
+    }
+}
+
+
+void batteryTask(void* param)
+{
+    while (true)
+    {
+        const auto vbat = sensors::measureBattery(16);
         const auto vbat_pct = battery_mv_to_zigbee_percent(vbat, BatteryType::LiIon1S);
         ESP_LOGI(TAG, "Battery voltage %lu mV (%u %%)", vbat, vbat_pct);
         zigbee::updateVbat(vbat, vbat_pct);
 
-        tick::delay(20'000);
+        tick::delay(15 * 60 * 1000);
     }
 }
