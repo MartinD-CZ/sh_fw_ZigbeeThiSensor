@@ -6,7 +6,10 @@
 #include "mal_assert.h"
 #include "mal_tick.h"
 
+#include "esp_log.h"
 #include "esp_adc/adc_oneshot.h"
+#include "esp_adc/adc_cali.h"
+#include "esp_adc/adc_cali_scheme.h"
 
 
 const Gpio 					sda{GPIO_NUM_10}, scl{GPIO_NUM_11}, ill_int{GPIO_NUM_22}, vbat_en{GPIO_NUM_0};
@@ -14,6 +17,14 @@ I2cMaster 					i2c1{I2C_NUM_1, sda, scl};
 SHT4x						sht4x{i2c1};
 LTR308						ltr308{i2c1};
 adc_oneshot_unit_handle_t 	adc1;
+adc_cali_handle_t 			adc1_cali;
+
+constexpr static auto VBAT_ADC_CHANNEL = ADC_CHANNEL_0;
+constexpr static auto VBAT_ADC_ATTEN = ADC_ATTEN_DB_12;
+constexpr static auto VBAT_ADC_WIDTH = ADC_BITWIDTH_DEFAULT;
+bool adc1_cali_ready = false;
+
+static const char* TAG = "sensors";
 
 
 void sensors::initI2c()
@@ -50,10 +61,25 @@ void sensors::initVbatMeasurement()
 	ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_config1, &adc1));
 
 	adc_oneshot_chan_cfg_t config = {
-		.atten = ADC_ATTEN_DB_12,
-		.bitwidth = ADC_BITWIDTH_DEFAULT,
+		.atten = VBAT_ADC_ATTEN,
+		.bitwidth = VBAT_ADC_WIDTH,
 	};
-	ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1, ADC_CHANNEL_0, &config));
+	ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1, VBAT_ADC_CHANNEL, &config));
+
+	adc_cali_curve_fitting_config_t cali_config = {};
+    cali_config.unit_id = ADC_UNIT_1;
+    cali_config.chan = VBAT_ADC_CHANNEL;
+    cali_config.atten = VBAT_ADC_ATTEN;
+    cali_config.bitwidth = VBAT_ADC_WIDTH;
+
+    esp_err_t err = adc_cali_create_scheme_curve_fitting(&cali_config, &adc1_cali);
+    if (err == ESP_OK)
+        adc1_cali_ready = true;
+    else
+	{
+        adc1_cali_ready = false;
+        ESP_LOGW(TAG, "ADC calibration not available: %s", esp_err_to_name(err));
+	}
 }
 
 
@@ -79,16 +105,30 @@ uint32_t sensors::getIllum()
 }
 
 
-uint16_t sensors::measureBattery()
+uint16_t sensors::measureBattery(size_t numSamples)
 {
 	vbat_en.setHigh();
 	tick::delay(5);
 
-	int raw;
-	adc_oneshot_read(adc1, ADC_CHANNEL_0, &raw);
+	//throw away first measurement
+	int raw, raw_acc = 0;
+	adc_oneshot_read(adc1, VBAT_ADC_CHANNEL, &raw);
+
+	for (size_t i = 0; i < numSamples; i++)
+	{
+		adc_oneshot_read(adc1, VBAT_ADC_CHANNEL, &raw);
+		raw_acc += raw;
+	}
+	raw_acc /= numSamples;
 	vbat_en.setLow();
 	
 	// Convert raw ADC value to millivolts
-	uint16_t voltage = (uint16_t)((raw * 1100 * 4 * 2) / 4095);
-	return voltage;
+	 int adc_pin_mv = 0;
+	if (adc1_cali_ready)
+		ESP_ERROR_CHECK(adc_cali_raw_to_voltage(adc1_cali, raw_acc, &adc_pin_mv));
+	else
+        adc_pin_mv = (raw_acc * 1100 * 4) / 4095;
+
+	const uint16_t vbat = adc_pin_mv * 2;
+	return vbat;
 }

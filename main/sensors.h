@@ -15,5 +15,5 @@ namespace sensors
 	void startIllumMeasurement();
 	uint32_t getIllum();
 
-	uint16_t measureBattery(); 
+	uint16_t measureBattery(size_t numSamples); 
 }
